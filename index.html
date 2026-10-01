@@ -599,7 +599,7 @@
       front: 'images/front-jaw.png',
       back: 'images/back-jaw.png',
       assy: 'images/assembly.png',
-      venya: 'images/venya_lab_photo.JPG',
+      venya: 'images/venya_lab_photo.jpg',
       vise: 'images/vise-stop-photo.jpg'
     };
 
@@ -663,7 +663,7 @@
         status: "RE-TOUCH DATUM",
         dim: "RE-ZEROED TO [A]",
         stamp: "RE-CALIBRATED",
-        hint: "CLICK TO CYCLE BREATH / STEP BACK IN"
+        hint: "CLICK EACH TOOL TO LOWER THE ALARM"
       },
       {
         tag: "SHIFT 04 • FINAL INSPECTION",
@@ -683,21 +683,21 @@
         title: "THE PERFECT VISE STOP",
         caption: "When I finally showed the shop monitor my completed vise stop, he said it was nearly perfect. The vise stop sits on my desk now, less a trophy of precision than a record of how I performed under pressure. I went into that shop to learn a machine and came away having learned something about rooms. Nothing in the process was sized for me, and I could have mistaken that for a verdict on whether I belonged. It wasn't one. It was a design condition, and conditions can be met, worked around, and eventually changed by the people willing to stay in the room.",
         note: "Learned: adapting is a skill. Redesigning the space is a responsibility.",
-        defaultMedia: 'venya',
-        visibleTabs: ['tabVenya', 'tabMill'],
+        defaultMedia: 'vise',
+        visibleTabs: ['tabVise', 'tabVenya'],
         stock: "6061 ALUM",
         status: "LESSONS LOGGED",
         dim: "ADAPT, THEN CHANGE THE ROOM",
         stamp: "ENTRY CLOSED",
-        hint: "CLICK TO FILL A SEAT"
+        hint: "CLICK TO TIGHTEN THE VISE"
       },
       {
         tag: "CLOSING NOTES • THE NEXT OPERATOR",
         title: "For Whoever Walks In Next",
         caption: "Most young women today immediately notice that the machine was never sized for them, so they quietly assume they can never inhabit the world of aerospace. At this moment, I want to be the person beside them at the controls, working through the machine until the awkward reach, the shaky first cut, and the unasked question feel ordinary. The vise stop on my desk is a reminder of who that work is for.",
         note: "Next: make the room dimensioned for more than one kind of operator.",
-        defaultMedia: 'vise',
-        visibleTabs: ['tabVise', 'tabVenya'],
+        defaultMedia: 'venya',
+        visibleTabs: ['tabVenya', 'tabVise'],
         stock: "6061 ALUM",
         status: "HANDOFF",
         dim: "NEXT OPERATOR: YOU",
@@ -719,7 +719,10 @@
     let estopActive = false;
     let breathProgress = 0;
     let pinInsertY = 0;
-    let roomCount = 1;
+    let clampX = 0;
+    let toolsUsed = [false, false, false, false];
+    let intensity = 1;
+    let lastTool = -1;
     let doorAngle = 0;
     let doorTarget = 0;
     let walkP = 0;
@@ -843,7 +846,7 @@
     }
 
     // Canvas Click Interactions
-    canvas.addEventListener('click', () => {
+    canvas.addEventListener('click', (e) => {
       if (currentSpread === 0) {
         if (jumpY === 0) jumpVel = -6.5;
       } else if (currentSpread === 1) {
@@ -852,11 +855,11 @@
       } else if (currentSpread === 2) {
         estopActive = !estopActive;
       } else if (currentSpread === 3) {
-        breathProgress = 0;
+        handleSupportClick(e);
       } else if (currentSpread === 4) {
         pinInsertY = Math.min(50, pinInsertY + 12);
       } else if (currentSpread === 5) {
-        roomCount = roomCount >= 12 ? 1 : roomCount + 1;
+        clampX = clampX >= 70 ? 0 : Math.min(70, clampX + 14);
       } else if (currentSpread === 6) {
         doorTarget = doorTarget ? 0 : 1.35;
       }
@@ -1067,46 +1070,92 @@
       ctx.textAlign = 'start';
     }
 
-    // --- Scene 4: Stairwell Reset & Arrow ---
+    // --- Scene 4: Panic and Support Tools ---
+    const supportTools = [
+      { label: 'BREATHE: LONG EXHALE', tip: 'SLOW EXHALES SIGNAL THE BODY TO SETTLE' },
+      { label: 'GROUND: 5-4-3-2-1', tip: 'ANCHOR TO THE ROOM: 5 SEE, 4 TOUCH, 3 HEAR' },
+      { label: 'NAME IT: IT WILL PASS', tip: 'NAMING IT TAKES AWAY THE SURPRISE' },
+      { label: 'REACH OUT: ASK FOR HELP', tip: 'ASKING FOR HELP IS PART OF THE WORK' }
+    ];
+
+    function handleSupportClick(e) {
+      if (toolsUsed.every(Boolean)) {
+        toolsUsed = [false, false, false, false];
+        lastTool = -1;
+        return;
+      }
+      const r = canvas.getBoundingClientRect();
+      const x = (e.clientX - r.left) * canvas.width / r.width;
+      const y = (e.clientY - r.top) * canvas.height / r.height;
+      supportTools.forEach((tool, i) => {
+        const by = 32 + i * 38;
+        if (x >= 275 && x <= 445 && y >= by && y <= by + 30 && !toolsUsed[i]) {
+          toolsUsed[i] = true;
+          lastTool = i;
+        }
+      });
+    }
+
     function drawScene4() {
-      breathProgress = (breathProgress + 0.025) % (Math.PI * 2);
-      const breathR = 25 + Math.sin(breathProgress) * 9;
+      const used = toolsUsed.filter(Boolean).length;
+      intensity += ((1 - used * 0.22) - intensity) * 0.04;
+      const t = Date.now() * 0.006;
 
+      // baseline + alarm trace: jagged and high at first, settling as tools are used
       ctx.strokeStyle = '#94a3b8';
-      ctx.lineWidth = 2;
+      ctx.lineWidth = 1;
+      ctx.setLineDash([4, 3]);
       ctx.beginPath();
-      ctx.moveTo(40, 160); ctx.lineTo(80, 160);
-      ctx.lineTo(80, 125); ctx.lineTo(120, 125);
-      ctx.lineTo(120, 90); ctx.lineTo(160, 90);
+      ctx.moveTo(30, 140); ctx.lineTo(255, 140);
       ctx.stroke();
-
-      ctx.fillStyle = 'rgba(27, 56, 84, 0.08)';
-      ctx.beginPath();
-      ctx.arc(100, 60, breathR, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.strokeStyle = '#1b3854';
-      ctx.stroke();
-
+      ctx.setLineDash([]);
+      ctx.fillStyle = '#777';
+      ctx.font = '8.5px "IBM Plex Mono"';
+      ctx.fillText('BASELINE', 30, 152);
       ctx.fillStyle = '#1b3854';
       ctx.font = '9.5px "IBM Plex Mono"';
-      ctx.fillText('RESET PACE: 4s IN / 4s OUT', 40, 30);
+      ctx.fillText('BODY ALARM', 30, 22);
 
-      ctx.strokeStyle = '#b22d26';
+      ctx.strokeStyle = intensity > 0.55 ? '#b22d26' : '#1b3854';
       ctx.lineWidth = 2;
+      ctx.lineJoin = 'round';
       ctx.beginPath();
-      ctx.moveTo(210, 110);
-      ctx.bezierCurveTo(250, 60, 300, 140, 360, 110);
-      ctx.stroke();
-      ctx.beginPath();
-      ctx.moveTo(350, 102); ctx.lineTo(362, 110); ctx.lineTo(350, 118);
+      for (let x = 30; x <= 255; x += 3) {
+        const y = 135 - intensity * 70 + Math.sin(x * 0.35 + t * 3) * intensity * 16 + Math.sin(x * 0.11 + t) * intensity * 6;
+        if (x === 30) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+      }
       ctx.stroke();
 
-      ctx.strokeStyle = '#1b3854';
-      ctx.strokeRect(375, 45, 55, 110);
-      ctx.strokeRect(375, 45, 27, 110);
+      // lead-in line above the tools
       ctx.fillStyle = '#1b3854';
-      ctx.fillText('13:10 HRS', 375, 38);
-      ctx.fillText('RE-ENTER SHOP', 240, 150);
+      ctx.font = '9.5px "IBM Plex Mono"';
+      ctx.fillText('WHEN YOU FEEL PANIC,', 275, 14);
+      ctx.fillText('THESE MAY HELP:', 275, 26);
+
+      // support tools
+      supportTools.forEach((tool, i) => {
+        const by = 32 + i * 38;
+        const on = toolsUsed[i];
+        ctx.fillStyle = on ? '#1b3854' : '#ffffff';
+        ctx.fillRect(275, by, 170, 30);
+        ctx.strokeStyle = '#1b3854';
+        ctx.lineWidth = 1.5;
+        ctx.strokeRect(275, by, 170, 30);
+        ctx.fillStyle = on ? '#f8f5ee' : '#1b3854';
+        ctx.font = '9px "IBM Plex Mono"';
+        ctx.fillText((on ? '\u2713 ' : '') + tool.label, 285, by + 19);
+      });
+
+      ctx.font = '9px "IBM Plex Mono"';
+      if (lastTool >= 0) {
+        ctx.fillStyle = '#555047';
+        ctx.fillText(supportTools[lastTool].tip, 30, 168);
+      }
+      let status = 'ALARM ON // IT PEAKS AND PASSES';
+      if (used === 4) status = '\u2713 SUPPORTED // REASONING RETURNS';
+      else if (used > 0) status = 'TOOLS USED: ' + used + ' OF 4';
+      ctx.fillStyle = used === 4 ? '#2e7d32' : '#b22d26';
+      ctx.fillText(status, 30, 186);
     }
 
     // --- Scene 5: Dowel Pin Interference Fit ---
@@ -1145,30 +1194,58 @@
       }
     }
 
-    // --- Scene 6: Counting the Room ---
+    // --- Scene 6: Tightening the Vise ---
     function drawScene6() {
-      const total = 12;
-      ctx.fillStyle = '#1b3854';
-      ctx.font = '9.5px "IBM Plex Mono"';
-      ctx.fillText('COUNTING THE ROOM', 40, 34);
-      ctx.lineWidth = 2;
       ctx.lineCap = 'round';
-      for (let i = 0; i < total; i++) {
-        const x = 52 + i * 33;
-        const y = 90;
-        ctx.strokeStyle = i < roomCount ? '#b22d26' : '#1b3854';
-        ctx.beginPath();
-        ctx.arc(x, y - 16, 7, 0, Math.PI * 2);
-        ctx.moveTo(x, y - 9); ctx.lineTo(x, y + 14);
-        ctx.moveTo(x - 9, y); ctx.lineTo(x + 9, y);
-        ctx.moveTo(x, y + 14); ctx.lineTo(x - 7, y + 32);
-        ctx.moveTo(x, y + 14); ctx.lineTo(x + 7, y + 32);
-        ctx.stroke();
-      }
-      ctx.fillStyle = '#b22d26';
-      ctx.fillText('TALLY: ' + roomCount + ' OF ' + total, 40, 160);
+      ctx.lineWidth = 2;
+
+      // bed
+      ctx.fillStyle = '#cbd5e1';
+      ctx.fillRect(50, 150, 360, 12);
+
+      // fixed jaw
       ctx.fillStyle = '#1b3854';
-      ctx.fillText(roomCount >= 6 ? 'THE COUNT STOPS MATTERING' : 'THE COUNT IS ALWAYS RUNNING', 40, 178);
+      ctx.fillRect(70, 85, 40, 65);
+
+      // the vise stop (workpiece)
+      ctx.fillStyle = '#e8edf3';
+      ctx.strokeStyle = '#1b3854';
+      ctx.fillRect(110, 108, 90, 42);
+      ctx.strokeRect(110, 108, 90, 42);
+      ctx.fillStyle = '#b22d26';
+      ctx.font = '8.5px "IBM Plex Mono"';
+      ctx.fillText('VISE STOP', 122, 133);
+
+      // moving jaw + screw
+      const jawX = 270 - clampX;
+      ctx.fillStyle = '#1b3854';
+      ctx.fillRect(jawX, 85, 40, 65);
+      ctx.strokeStyle = '#64748b';
+      ctx.lineWidth = 4;
+      ctx.beginPath();
+      ctx.moveTo(jawX + 40, 117); ctx.lineTo(395, 117);
+      ctx.stroke();
+
+      // handle turns as the jaw advances
+      const a = clampX * 0.12;
+      ctx.strokeStyle = '#b22d26';
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.moveTo(395 - Math.cos(a) * 20, 117 - Math.sin(a) * 20);
+      ctx.lineTo(395 + Math.cos(a) * 20, 117 + Math.sin(a) * 20);
+      ctx.stroke();
+
+      ctx.font = '9.5px "IBM Plex Mono"';
+      if (clampX >= 70) {
+        ctx.fillStyle = '#2e7d32';
+        ctx.fillText('\u2713 SEATED SQUARE TO DATUM [A]', 70, 182);
+      } else {
+        ctx.fillStyle = '#1b3854';
+        ctx.fillText('CLAMPING... ' + Math.round((clampX / 70) * 100) + '%', 70, 182);
+      }
+      ctx.fillStyle = '#1b3854';
+      ctx.fillText('FIXED JAW', 66, 76);
+      ctx.fillText('MOVING JAW', jawX - 10, 76);
     }
 
     // --- Scene 7: Holding the Door ---
